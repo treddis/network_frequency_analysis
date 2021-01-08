@@ -30,13 +30,16 @@ optional arguments:
 
 Output example
 --------------
+Execution:
 ```
 python freq_analyze_inet.py counting
 ```
 **Be careful! Output on your machine may be much larger.**
 You can redirect output to file to avoid data loss
 
-Output
+Output format is field: value: frequency
+
+Output:
 ```
 [+] Result of working: Ethernet II
 dst:
