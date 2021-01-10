@@ -10,38 +10,46 @@ Installation
 ------------
 ```
 git clone https://github.com/treddis/network_frequency_analysis
+cd network_frequency_analysis
+pip3 install -r requirements.txt
 ```
 
 Usage
 -----
 ```
-usage: freq_analyze_inet.py [-h] {counting}
+usage: freq_analyze_inet.py [-h] [-o {json,csv}] [-l {link,internet,transport,application}] [-t TIMER] {counting}
 
 sniffer for frequence analyze of traffic
 
 positional arguments:
-  {counting}  mode of working: counting - estimation of packets
+  {counting}            mode of working: counting - estimation of packets
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help            show this help message and exit
+  -o {json,csv}, --output {json,csv}
+                        output format of report
+  -l {link,internet,transport,application}, --layer {link,internet,transport,application}
+                        choose layer for analyze and forging report
+  -t TIMER, --timer TIMER
+                        set timer in seconds to stop capturing after expiration
 ```
 
-**You must send Ctrl^C signal to program to stop capturing traffic**
+**You should send Ctrl^C signal to program to stop capturing traffic if you're not going to set up timer**
 
 Output example
 --------------
 Execution:
 ```
-python freq_analyze_inet.py counting
+python freq_analyze_inet.py -l link,internet,transport -t 30 counting
 ```
 **Be careful! Output on your machine may be much larger.**
 You can redirect output to file to avoid data loss
 
-Output format is field: value: frequency
+Next output is pretty-printed
 
 Output:
 ```
-[+] Result of working: Ethernet II
+[+] Result of working: Link layer
 dst:
         17:37:03:2d:eb:dd : 18
         b1:4a:a0:96:1f:8a : 16
@@ -54,7 +62,7 @@ src:
 type:
         2048 : 40
 
-[+] Result of working: IP
+[+] Result of working: Internet layer
 options:
         () : 41
 version:
@@ -132,7 +140,7 @@ dst:
         239.255.255.250 : 4
         192.168.0.255 : 1
 
-[+] Result of working: TCP
+[+] Result of working: Transport layer
 sport:
         443 : 17
         52988 : 1
