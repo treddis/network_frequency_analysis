@@ -11,8 +11,9 @@ import pandas
 from sys import argv, stderr
 from json import dumps
 from time import sleep
+from hashlib import sha256
 
-LAYERS = ['link', 'internet', 'transport', 'application']
+LAYERS = ['link', 'network', 'transport', 'application']
 ether_layer = {
 	'dst': {},
 	'src': {},
@@ -80,48 +81,71 @@ def print_dict_pretty(dic, tabnum=0):
 			print(f"{key} : {dic[key]}")
 
 def main():
-	global ether_layer
-
 	if timer:
-		# sniffer = scapy.all.AsyncSniffer()
-		# sniffer.start()
-		# sleep(timer)
-		# pkts = sniffer.stop()
 		pkts = scapy.all.sniff(timeout=timer)
-		# del sniffer
 	else:
 		pkts = scapy.all.sniff()
+
+	if not analyze_fields:
+		ether_layer.clear()
+		ip_layer.clear()
+		tcp_layer.clear()
+		udp_layer.clear()
 
 	# if opts.mode == 'counting':
 	for pkt in pkts:
 		if pkt.haslayer(Ether) and 'link' in layers:
-			for key in pkt[Ether].fields.keys():
-				if pkt[Ether].fields[key] not in ether_layer[key]:
-					ether_layer[key][pkt[Ether].fields[key]] = 1
+			if analyze_fields:
+				for key in pkt[Ether].fields.keys():
+					if pkt[Ether].fields[key] not in ether_layer[key]:
+						ether_layer[key][pkt[Ether].fields[key]] = 1
+					else:
+						ether_layer[key][pkt[Ether].fields[key]] += 1
+			else:
+				pkt_hash = sha256(bytes(pkt)).hexdigest()
+				if pkt_hash not in ether_layer:
+					ether_layer[pkt_hash] = 1
 				else:
-					ether_layer[key][pkt[Ether].fields[key]] += 1
+					ether_layer[pkt_hash] += 1
 
-		if pkt.haslayer(IP) and 'internet' in layers:
-			for key in pkt[IP].fields.keys():
-				if type(pkt[IP].fields[key]) is list:						# Fix TypeError: unhashable type: 'list'
-					pkt[IP].fields[key] = str(pkt[IP].fields[key])
-				elif type(pkt[IP].fields[key]) is scapy.fields.FlagValue:   # Fix TypeError: FlagValue for dumps()
-					pkt[IP].fields[key] = str(pkt[IP].fields[key])
-				if pkt[IP].fields[key] not in ip_layer[key]:
-					ip_layer[key][pkt[IP].fields[key]] = 1
+		if pkt.haslayer(IP) and 'network' in layers:
+			if analyze_fields:
+				for key in pkt[IP].fields.keys():
+					if type(pkt[IP].fields[key]) is list:						# Fix TypeError: unhashable type: 'list'
+						pkt[IP].fields[key] = str(pkt[IP].fields[key])
+					elif type(pkt[IP].fields[key]) is scapy.fields.FlagValue:   # Fix TypeError: FlagValue for dumps()
+						pkt[IP].fields[key] = str(pkt[IP].fields[key])
+					if pkt[IP].fields[key] not in ip_layer[key]:
+						ip_layer[key][pkt[IP].fields[key]] = 1
+					else:
+						ip_layer[key][pkt[IP].fields[key]] += 1
+			else:
+				pkt_hash = sha256(bytes(pkt)).hexdigest()
+				if pkt_hash not in ip_layer:
+					ip_layer[pkt_hash] = 1
 				else:
-					ip_layer[key][pkt[IP].fields[key]] += 1
+					ip_layer[pkt_hash] += 1
+
 		if pkt.haslayer(TCP) and 'transport' in layers:
-			for key in pkt[TCP].fields.keys():
-				if type(pkt[TCP].fields[key]) is list:						# Fix TypeError: unhashable type: 'list'
-					pkt[TCP].fields[key] = str(pkt[TCP].fields[key])
-				elif type(pkt[TCP].fields[key]) is scapy.fields.FlagValue:  # Fix TypeError: FlagValue for dumps()
-					pkt[TCP].fields[key] = str(pkt[TCP].fields[key])
-				if pkt[TCP].fields[key] not in tcp_layer[key]:
-					tcp_layer[key][pkt[TCP].fields[key]] = 1
+			if analyze_fields:
+				for key in pkt[TCP].fields.keys():
+					if type(pkt[TCP].fields[key]) is list:						# Fix TypeError: unhashable type: 'list'
+						pkt[TCP].fields[key] = str(pkt[TCP].fields[key])
+					elif type(pkt[TCP].fields[key]) is scapy.fields.FlagValue:  # Fix TypeError: FlagValue for dumps()
+						pkt[TCP].fields[key] = str(pkt[TCP].fields[key])
+					if pkt[TCP].fields[key] not in tcp_layer[key]:
+						tcp_layer[key][pkt[TCP].fields[key]] = 1
+					else:
+						tcp_layer[key][pkt[TCP].fields[key]] += 1
+			else:
+				pkt_hash = sha256(bytes(pkt)).hexdigest()
+				if pkt_hash not in tcp_layer:
+					tcp_layer[pkt_hash] = 1
 				else:
-					tcp_layer[key][pkt[TCP].fields[key]] += 1
+					tcp_layer[pkt_hash] += 1
+
 		if pkt.haslayer(UDP) and 'transport' in layers:
+			if analyze_fields:
 				for key in pkt[UDP].fields.keys():
 					if type(pkt[UDP].fields[key]) is list:						# Fix TypeError: unhashable type: 'list'
 						pkt[UDP].fields[key] = str(pkt[UDP].fields[key])
@@ -131,18 +155,24 @@ def main():
 						udp_layer[key][pkt[UDP].fields[key]] = 1
 					else:
 						udp_layer[key][pkt[UDP].fields[key]] += 1			
+			else:
+				pkt_hash = sha256(bytes(pkt)).hexdigest()
+				if pkt_hash not in udp_layer:
+					udp_layer[pkt_hash] = 1
+				else:
+					udp_layer[pkt_hash] += 1
 
 	# pdb.set_trace()
 	if 'link' in layers:
-		print('[+] Report: Link layer', file=stderr)
+		print('[+] Report: Link layer (Number of captured packets: %d)' % len(pkts))
 		if output == 'json':
 			print_report('json', ether_layer)
 		elif output == 'csv':
 			print_report('csv', ether_layer)
 		else:
 			print_report('pretty', ether_layer)
-	if 'internet' in layers:
-		print('\n[+] Report: Internet layer', file=stderr)
+	if 'network' in layers:
+		print('\n[+] Report: Network layer (Number of captured packets: %d)' % len(pkts))
 		if output == 'json':
 			print_report('json', ip_layer)
 		elif output == 'csv':
@@ -150,7 +180,7 @@ def main():
 		else:
 			print_report('pretty', ip_layer)
 	if 'transport' in layers:
-		print('\n[+] Report: Transport layer', file=stderr)
+		print('\n[+] Report: Transport layer (Number of captured packets: %d)' % len(pkts))
 		trans_layer = {
 			'tcp': tcp_layer,
 			'udp': udp_layer}
@@ -166,7 +196,9 @@ if __name__ == '__main__':
 	parser.add_argument('-o', '--output', choices=['json', 'csv'],
 		help='output format of report')
 	parser.add_argument('-l', '--layer', type=str,
-		metavar='{link,internet,transport,application}', help='choose layer for analyze and forging report')
+		metavar='{link, network, transport, application}', help='choose layer for analyze and forging report')
+	parser.add_argument('--count-mode', choices=['packet', 'field'], default='field',
+		help='choose for analysis whole packet or packet fragment')
 	parser.add_argument('-t', '--timer', type=int,
 		help='set timer in seconds to stop capturing after expiration')
 	parser.add_argument('mode', choices=['counting'],
@@ -176,12 +208,13 @@ if __name__ == '__main__':
 		parser.print_help()
 		exit(1)
 
-	opts = parser.parse_args()
-	layers = opts.layer.split(',')
+	args = parser.parse_args()
+	layers = args.layer.split(',')
 	if len([x for x in layers if x not in LAYERS]):
 		parser.error('Invalid parameter "--layer"')
 	# pdb.set_trace()
-	timer = opts.timer
-	output = opts.output if opts.output else None
+	timer = args.timer
+	output = args.output if args.output else None
+	analyze_fields = True if args.count_mode == 'field' else False
 
 	main()
